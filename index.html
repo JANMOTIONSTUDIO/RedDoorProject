@@ -151,13 +151,14 @@
         <a-sphere position="0.45 0.235 -1.37" radius="0.012" material="color: #ff2a2a; emissive: #ff0000; emissiveIntensity: 1.5"></a-sphere>
         <a-entity light="type: point; color: #ff3030; intensity: 0.25; distance: 0.4" position="0.45 0.235 -1.3"></a-entity>
 
-        <!-- Window (your model) set into the back wall, standing a little proud of it so it reads clearly.
-             Sill about 0.9 m from the floor. Behind the panes, an evening sky; cool light comes in. -->
-        <a-plane position="-0.45 0.04 -1.36" width="0.42" height="0.56"
+        <!-- Window (your model), a third of its previous size: a small deep-set cottage window,
+             about 80 cm across including its surround, sill about 1 m from the floor.
+             Behind the panes, an evening sky; cool light comes in. -->
+        <a-plane position="-0.3 -0.097 -1.392" width="0.15" height="0.2"
                  material="shader: flat; color: #a7bccf"></a-plane>
         <a-entity id="window" gltf-model="#window-model"
-                  position="-0.45 0.048 -1.515" scale="0.4 0.4 0.4"></a-entity>
-        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.5" position="-0.45 0.35 -1.8"></a-entity>
+                  position="-0.3 -0.094 -1.445" scale="0.133 0.133 0.133"></a-entity>
+        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.45" position="-0.3 0.35 -1.8"></a-entity>
 
         <!-- Table (your 1926 model), about 1.2 m long and 72 cm high, brought forward into the room
              on the left, clear of her path. -->
@@ -283,6 +284,15 @@
       if (String(args[0]).includes('No target node found')) { missingTracks++; debug('tracks not matched', missingTracks); }
       origWarn.apply(console, args);
     };
+
+    // In ?debug=1 mode, list which model files loaded or failed
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[gltf-model]').forEach(el => {
+        const name = el.id || el.parentNode.id || el.getAttribute('gltf-model');
+        el.addEventListener('model-loaded', () => debug('model ' + name, 'loaded'));
+        el.addEventListener('model-error', () => debug('model ' + name, 'FAILED to load'));
+      });
+    });
 
     // Fade a model in from transparent
     function fadeIn(el, ms = 1500) {
@@ -466,7 +476,7 @@
           this.woman.components['play-clip'].playClip();
         }, 2600));
         // Book appears just after she has sat down (her animation is 8.3 s)
-        this.timers.push(setTimeout(() => fadeIn(this.book), 2600 + 8300 + 600));
+        this.timers.push(setTimeout(() => { fadeIn(this.book); debug('book', 'shown'); }, 2600 + 8300 + 600));
         // Music button appears once the room is open
         this.timers.push(setTimeout(() => document.querySelector('#music-btn').classList.remove('hidden'), 3500));
       },
