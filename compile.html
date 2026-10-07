@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Make targets.mind</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    body { font-family: Georgia, serif; background: #1b1611; color: #ece5d8; margin: 0; padding: 2rem 1.5rem; line-height: 1.55; }
+    main { max-width: 36rem; }
+    img { width: 100%; max-width: 24rem; display: block; margin: 1rem 0; }
+    button, a.save { font: 1.05rem Georgia, serif; background: #a8161d; color: #ece5d8; border: 0; padding: 0.8rem 1.6rem; cursor: pointer; text-decoration: none; display: inline-block; }
+    button:focus-visible, a.save:focus-visible { outline: 3px solid #ece5d8; outline-offset: 3px; }
+    #status { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Make targets.mind</h1>
+    <p>This turns the painting photo into the tracking file the AR scene needs. Do it once, on a laptop, then add the downloaded file to the site folder next to index.html and deploy again.</p>
+    <img src="painting-target.jpg" alt="The red door painting used as the AR target">
+    <button id="go" type="button">Make targets.mind</button>
+    <p id="status"></p>
+  </main>
+  <script>
+    const go = document.querySelector('#go');
+    const status = document.querySelector('#status');
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      try {
+        const img = new Image();
+        img.src = './painting-target.jpg';
+        await img.decode();
+        const compiler = new window.MINDAR.IMAGE.Compiler();
+        await compiler.compileImageTargets([img], p => { status.textContent = 'Working… ' + Math.round(p) + '%'; });
+        const data = await compiler.exportData();
+        const url = URL.createObjectURL(new Blob([data]));
+        status.innerHTML = '';
+        const a = document.createElement('a');
+        a.href = url; a.download = 'targets.mind'; a.className = 'save'; a.textContent = 'Save targets.mind';
+        status.appendChild(a);
+        a.click();
+      } catch (e) {
+        go.disabled = false;
+        status.textContent = 'This browser could not make the file. Try Chrome on a laptop, or use the MindAR online compiler with painting-target.jpg.';
+      }
+    });
+  </script>
+</body>
+</html>
