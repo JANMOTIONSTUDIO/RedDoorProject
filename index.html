@@ -67,6 +67,12 @@
       width: min(88vw, 26rem); text-align: center; font-style: italic;
       background: rgba(27,22,17,0.75); padding: 0.5rem 0.9rem; line-height: 1.4; font-size: 0.95rem;
     }
+    #music-btn {
+      position: fixed; z-index: 6;
+      right: calc(1rem + env(safe-area-inset-right, 0px));
+      bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+      font-size: 1rem; padding: 0.7rem 1.2rem;
+    }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -82,13 +88,12 @@
   <div id="hint" class="hidden">Point your camera at the painting</div>
   <button id="knock" class="door-button hidden" type="button">Knock</button>
   <div id="error" role="alert"></div>
-  <div id="caption" class="hidden">Music generated with AI, 2026. Tap the radio again to stop.</div>
+  <div id="caption" class="hidden">Music generated with AI, 2026</div>
+  <button id="music-btn" class="door-button hidden" type="button">Play music</button>
 
   <a-scene
     mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: no; uiLoading: yes; uiError: no; filterMinCF: 0.0001; filterBeta: 0.001"
     renderer="colorManagement: true; antialias: true"
-    cursor="rayOrigin: mouse; fuse: false"
-    raycaster="objects: .clickable"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
@@ -98,6 +103,7 @@
       <a-asset-item id="radio-model" src="./radio.glb"></a-asset-item>
       <a-asset-item id="book-model" src="./book.glb"></a-asset-item>
       <a-asset-item id="window-model" src="./window.glb"></a-asset-item>
+      <a-asset-item id="table-model" src="./table.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -145,23 +151,24 @@
         <a-sphere position="0.45 0.235 -1.37" radius="0.012" material="color: #ff2a2a; emissive: #ff0000; emissiveIntensity: 1.5"></a-sphere>
         <a-entity light="type: point; color: #ff3030; intensity: 0.25; distance: 0.4" position="0.45 0.235 -1.3"></a-entity>
 
-        <!-- Window (your model) set into the back wall above the table, sill about 0.9 m from the floor.
-             Behind it, an evening sky; a cool light comes in through it. -->
-        <a-plane position="-0.45 -0.015 -1.398" width="0.34" height="0.44"
-                 material="shader: flat; color: #8fa6bb"></a-plane>
+        <!-- Window (your model) set into the back wall, standing a little proud of it so it reads clearly.
+             Sill about 0.9 m from the floor. Behind the panes, an evening sky; cool light comes in. -->
+        <a-plane position="-0.45 0.04 -1.36" width="0.42" height="0.56"
+                 material="shader: flat; color: #a7bccf"></a-plane>
         <a-entity id="window" gltf-model="#window-model"
-                  position="-0.45 -0.009 -1.551" scale="0.32 0.32 0.32"></a-entity>
-        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.45" position="-0.45 0.35 -1.8"></a-entity>
+                  position="-0.45 0.048 -1.515" scale="0.4 0.4 0.4"></a-entity>
+        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.5" position="-0.45 0.35 -1.8"></a-entity>
 
-        <!-- small table (a place for the 1926 radio later) -->
-        <a-box position="-0.62 -0.33 -1.05" width="0.34" height="0.025" depth="0.24" material="color: #5a3e24"></a-box>
-        <a-box position="-0.62 -0.42 -1.05" width="0.3" height="0.16" depth="0.2" material="color: #4a321c"></a-box>
+        <!-- Table (your 1926 model), about 1.2 m long and 72 cm high, brought forward into the room
+             on the left, clear of her path. -->
+        <a-entity id="table" gltf-model="#table-model"
+                  position="-0.55 -0.332 -0.75" scale="0.208 0.208 0.208"></a-entity>
 
-        <!-- Your radio/gramophone on the table, about 38 cm wide, turned a little towards the room.
-             The invisible box around it makes it easier to tap on a phone. -->
-        <a-entity id="radio" position="-0.62 -0.248 -1.05" rotation="0 20 0">
+        <!-- Gramophone on the left end of the table, beside the vase, turned towards the room.
+             The invisible box around it makes it easier to tap. -->
+        <a-entity id="radio" position="-0.66 -0.2 -0.74" rotation="0 25 0">
           <a-entity gltf-model="#radio-model" scale="0.0736 0.0736 0.0736"></a-entity>
-          <a-box class="clickable" radio-tap width="0.2" height="0.18" depth="0.2" position="0 0.01 0"
+          <a-box class="clickable" radio-tap width="0.22" height="0.2" depth="0.22" position="0 0.01 0"
                  material="opacity: 0; transparent: true; depthWrite: false"></a-box>
         </a-entity>
 
@@ -173,10 +180,11 @@
                     play-clip="clip: Walk_to_Sit"
                     visible="false"></a-entity>
 
-          <!-- The book (Irish Idylls), about 19 cm tall, on the floor by her right foot.
+          <!-- The book (Irish Idylls), propped up by her right foot with its cover facing the viewer.
                It fades in once she has sat down. -->
-          <a-entity id="book" gltf-model="#book-model" position="1.0 0 1.9" rotation="0 -25 0"
-                    scale="0.19 0.19 0.19" visible="false"></a-entity>
+          <a-entity id="book" position="1.0 0 1.9" rotation="0 -20 0" visible="false">
+            <a-entity gltf-model="#book-model" position="0 0.118 0" rotation="80 0 0" scale="0.24 0.24 0.24"></a-entity>
+          </a-entity>
 
           <!-- Súgán-style chair where the animation sits her down.
                If she sits too high or low, change the y of #chair; move it with x and z. -->
@@ -280,8 +288,7 @@
     function fadeIn(el, ms = 1500) {
       el.setAttribute('visible', true);
       const mats = [];
-      const obj = el.getObject3D('mesh');
-      if (!obj) return;
+      const obj = el.object3D;
       obj.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = 0; mats.push(m); }); });
       const t0 = performance.now();
       const step = now => {
@@ -310,25 +317,28 @@
     function stopRadio() {
       music.pause(); music.currentTime = 0;
       document.querySelector('#caption').classList.add('hidden');
+      document.querySelector('#music-btn').textContent = 'Play music';
+    }
+    function toggleRadio() {
+      const caption = document.querySelector('#caption');
+      const btn = document.querySelector('#music-btn');
+      if (!music.paused) { stopRadio(); return; }
+      playStatic();
+      // Start the music inside the tap itself (iPhones require this), muted under the static, then bring it in.
+      music.muted = true;
+      const p = music.play();
+      btn.textContent = 'Stop music';
+      Promise.resolve(p).then(() => {
+        caption.classList.remove('hidden');
+        setTimeout(() => { music.muted = false; }, 900);
+      }).catch(() => {
+        btn.textContent = 'Play music';
+        caption.textContent = 'The music could not play. Check music.mp3 is on the site.';
+        caption.classList.remove('hidden');
+      });
     }
     AFRAME.registerComponent('radio-tap', {
-      init() {
-        this.el.addEventListener('click', () => {
-          const caption = document.querySelector('#caption');
-          if (!music.paused) { stopRadio(); return; }
-          playStatic();
-          // Start the music inside the tap itself (iPhones require this), muted under the static,
-          // then bring it in.
-          music.muted = true;
-          music.play().then(() => {
-            caption.classList.remove('hidden');
-            setTimeout(() => { music.muted = false; }, 900);
-          }).catch(() => {
-            caption.textContent = 'The music could not play. Check music.mp3 is on the site.';
-            caption.classList.remove('hidden');
-          });
-        });
-      }
+      init() { this.el.addEventListener('tap', toggleRadio); }
     });
 
     // Gentle firelight flicker on a light
@@ -439,9 +449,7 @@
         });
         this.knock.addEventListener('click', () => this.open());
         this.book = document.querySelector('#book');
-        this.woman.addEventListener('clip-finished', () => {
-          if (this.state === 'open') this.timers.push(setTimeout(() => fadeIn(this.book), 600));
-        });
+
       },
       open() {
         if (this.state !== 'ready') return;
@@ -457,6 +465,10 @@
           this.woman.setAttribute('visible', true);
           this.woman.components['play-clip'].playClip();
         }, 2600));
+        // Book appears just after she has sat down (her animation is 8.3 s)
+        this.timers.push(setTimeout(() => fadeIn(this.book), 2600 + 8300 + 600));
+        // Music button appears once the room is open
+        this.timers.push(setTimeout(() => document.querySelector('#music-btn').classList.remove('hidden'), 3500));
       },
       reset() {
         this.timers.forEach(clearTimeout); this.timers = [];
@@ -468,6 +480,7 @@
         this.woman.setAttribute('visible', false);
         this.woman.components['play-clip'].stopClip();
         this.book.setAttribute('visible', false);
+        document.querySelector('#music-btn').classList.add('hidden');
         stopRadio();
       }
     });
@@ -478,6 +491,29 @@
     const hint = document.querySelector('#hint');
     const errorBox = document.querySelector('#error');
     const sceneEl = document.querySelector('a-scene');
+
+    // Taps on 3D objects marked .clickable
+    const tapRay = new THREE.Raycaster();
+    function onCanvasTap(e) {
+      const cam = sceneEl.camera;
+      if (!cam) return;
+      const r = sceneEl.canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      cam.updateMatrixWorld();
+      cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+      tapRay.setFromCamera(ndc, cam);
+      const targets = [...document.querySelectorAll('.clickable')].map(el => el.object3D);
+      const hit = tapRay.intersectObjects(targets, true)[0];
+      if (!hit) return;
+      let o = hit.object;
+      while (o && !(o.el && o.el.classList.contains('clickable'))) o = o.parent;
+      if (o) o.el.emit('tap');
+    }
+    if (sceneEl.canvas) sceneEl.canvas.addEventListener('click', onCanvasTap);
+    else sceneEl.addEventListener('render-target-loaded', () => sceneEl.canvas.addEventListener('click', onCanvasTap));
+
+    document.querySelector('#music-btn').addEventListener('click', toggleRadio);
+
 
     function showError(msg) {
       errorBox.textContent = msg;
