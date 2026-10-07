@@ -73,6 +73,19 @@
       bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
       font-size: 1rem; padding: 0.7rem 1.2rem;
     }
+    #reader {
+      position: fixed; inset: 0; z-index: 30; background: rgba(27,22,17,0.96);
+      display: flex; flex-direction: column;
+      padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    #reader-scroll { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; -webkit-overflow-scrolling: touch; }
+    #reader-img { max-width: 100%; max-height: 100%; cursor: zoom-in; }
+    #reader.zoomed #reader-scroll { display: block; }
+    #reader.zoomed #reader-img { max-width: none; max-height: none; width: 260%; cursor: zoom-out; }
+    #reader-bar { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; }
+    #reader-bar p { margin: 0; font-size: 0.95rem; line-height: 1.4; }
+    #reader-close { font-size: 1rem; padding: 0.7rem 1.1rem; white-space: nowrap; }
+    #reader-close:focus-visible, #reader-img:focus-visible { outline: 3px solid var(--limewash); outline-offset: 3px; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -91,6 +104,14 @@
   <div id="caption" class="hidden">Music generated with AI, 2026</div>
   <button id="music-btn" class="door-button hidden" type="button">Play music</button>
 
+  <div id="reader" class="hidden" role="dialog" aria-label="Newspaper clippings">
+    <div id="reader-scroll"><img id="reader-img" alt="Clippings from the Meath Chronicle centenary edition: farming gloom in 1926, sugar beet experiments, migration to Meath, a Lamb's Jam advertisement, and the 'West Men' land dispute"></div>
+    <div id="reader-bar">
+      <p>From the <i>Meath Chronicle</i> centenary edition. Tap the page to zoom.</p>
+      <button id="reader-close" class="door-button" type="button">Back to the room</button>
+    </div>
+  </div>
+
   <a-scene
     mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: no; uiLoading: yes; uiError: no; filterMinCF: 0.0001; filterBeta: 0.001"
     renderer="colorManagement: true; antialias: true"
@@ -104,6 +125,7 @@
       <a-asset-item id="book-model" src="./book.glb"></a-asset-item>
       <a-asset-item id="window-model" src="./window.glb"></a-asset-item>
       <a-asset-item id="table-model" src="./table.glb"></a-asset-item>
+      <a-asset-item id="newspaper-model" src="./newspaper.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -164,6 +186,14 @@
              on the left, clear of her path. -->
         <a-entity id="table" gltf-model="#table-model"
                   position="-0.55 -0.332 -0.75" scale="0.208 0.208 0.208"></a-entity>
+
+        <!-- Newspaper clippings (Meath Chronicle), about 45 x 25 cm, propped up on the right end of the
+             table, leaning back against the vase. Tap to open it full screen. -->
+        <a-entity id="newspaper" position="-0.44 -0.235 -0.72" rotation="0 -15 0">
+          <a-entity gltf-model="#newspaper-model" rotation="60 0 0" scale="0.08 0.08 0.08"></a-entity>
+          <a-box class="clickable" newspaper-tap width="0.16" height="0.1" depth="0.08" position="0 0 0"
+                 material="opacity: 0; transparent: true; depthWrite: false"></a-box>
+        </a-entity>
 
         <!-- Gramophone on the left end of the table, beside the vase, turned towards the room.
              The invisible box around it makes it easier to tap. -->
@@ -351,6 +381,21 @@
       init() { this.el.addEventListener('tap', toggleRadio); }
     });
 
+    // Newspaper reader: full-screen image, tap to zoom in where you tapped
+    function openNewspaper() {
+      const reader = document.querySelector('#reader'), img = document.querySelector('#reader-img');
+      if (!img.getAttribute('src')) img.src = './newspaper.jpg';   // only download when first opened
+      reader.classList.remove('zoomed');
+      reader.classList.remove('hidden');
+      document.querySelector('#reader-close').focus();
+    }
+    function closeNewspaper() {
+      document.querySelector('#reader').classList.add('hidden');
+    }
+    AFRAME.registerComponent('newspaper-tap', {
+      init() { this.el.addEventListener('tap', openNewspaper); }
+    });
+
     // Gentle firelight flicker on a light
     AFRAME.registerComponent('flicker', {
       schema: { base: { default: 1.5 }, amount: { default: 0.3 } },
@@ -492,6 +537,7 @@
         this.book.setAttribute('visible', false);
         document.querySelector('#music-btn').classList.add('hidden');
         stopRadio();
+        closeNewspaper();
       }
     });
 
@@ -523,6 +569,18 @@
     else sceneEl.addEventListener('render-target-loaded', () => sceneEl.canvas.addEventListener('click', onCanvasTap));
 
     document.querySelector('#music-btn').addEventListener('click', toggleRadio);
+    document.querySelector('#reader-close').addEventListener('click', closeNewspaper);
+    document.querySelector('#reader-img').addEventListener('click', e => {
+      const reader = document.querySelector('#reader'), box = document.querySelector('#reader-scroll'), img = e.currentTarget;
+      const r = img.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      reader.classList.toggle('zoomed');
+      if (reader.classList.contains('zoomed')) {
+        box.scrollLeft = fx * img.offsetWidth - box.clientWidth / 2;
+        box.scrollTop = fy * img.offsetHeight - box.clientHeight / 2;
+      }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNewspaper(); });
 
 
     function showError(msg) {
