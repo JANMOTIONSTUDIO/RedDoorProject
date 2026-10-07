@@ -61,6 +61,12 @@
       background: rgba(27,22,17,0.82); padding: 0.8rem 1rem; line-height: 1.45;
     }
     #error { display: none; border-left: 6px solid var(--door); text-align: left; }
+    #caption {
+      position: fixed; left: 50%; transform: translateX(-50%); z-index: 5;
+      top: calc(1rem + env(safe-area-inset-top, 0px));
+      width: min(88vw, 26rem); text-align: center; font-style: italic;
+      background: rgba(27,22,17,0.75); padding: 0.5rem 0.9rem; line-height: 1.4; font-size: 0.95rem;
+    }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -76,15 +82,22 @@
   <div id="hint" class="hidden">Point your camera at the painting</div>
   <button id="knock" class="door-button hidden" type="button">Knock</button>
   <div id="error" role="alert"></div>
+  <div id="caption" class="hidden">Music generated with AI, 2026. Tap the radio again to stop.</div>
 
   <a-scene
     mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiScanning: no; uiLoading: yes; uiError: no; filterMinCF: 0.0001; filterBeta: 0.001"
     renderer="colorManagement: true; antialias: true"
+    cursor="rayOrigin: mouse; fuse: false"
+    raycaster="objects: .clickable"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
     <a-assets timeout="20000">
       <a-asset-item id="grandmother-model" src="./grandmother.glb"></a-asset-item>
+      <a-asset-item id="fireplace-model" src="./fireplace.glb"></a-asset-item>
+      <a-asset-item id="radio-model" src="./radio.glb"></a-asset-item>
+      <a-asset-item id="book-model" src="./book.glb"></a-asset-item>
+      <a-asset-item id="window-model" src="./window.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -109,32 +122,48 @@
       <!-- The room -->
       <a-entity id="room">
         <a-entity light="type: hemisphere; color: #ffe9cc; groundColor: #3b2c1e; intensity: 0.7"></a-entity>
-        <a-entity light="type: point; color: #ff9a4a; intensity: 1.6; distance: 2.2; decay: 1" position="0.45 -0.3 -1.15"></a-entity>
+        <a-entity light="type: point; color: #ff9a4a; intensity: 1.6; distance: 2.2; decay: 1" position="0.44 -0.42 -1.05" flicker="base: 1.6; amount: 0.35"></a-entity>
         <a-entity light="type: directional; color: #fff4e0; intensity: 0.5" position="-0.4 0.6 0.8"></a-entity>
 
         <!-- floor, walls, ceiling -->
         <a-plane position="0 -0.5 -0.7" rotation="-90 0 0" width="1.8" height="1.4" material="color: #4b4239; roughness: 1"></a-plane>
-        <a-plane position="0 0.125 -1.4" width="1.8" height="1.25" material="color: #d8cdb9; roughness: 1"></a-plane>
+        <a-plane position="0 0.125 -1.4" width="1.8" height="1.25" material="color: #e2dbcd; roughness: 1"></a-plane>
         <a-plane position="-0.9 0.125 -0.7" rotation="0 90 0" width="1.4" height="1.25" material="color: #cfc3ae; roughness: 1"></a-plane>
         <a-plane position="0.9 0.125 -0.7" rotation="0 -90 0" width="1.4" height="1.25" material="color: #cfc3ae; roughness: 1"></a-plane>
         <a-plane position="0 0.75 -0.7" rotation="90 0 0" width="1.8" height="1.4" material="color: #2f251b; roughness: 1"></a-plane>
         <a-box position="0 0.72 -0.35" width="1.8" height="0.05" depth="0.07" material="color: #241a12"></a-box>
         <a-box position="0 0.72 -0.95" width="1.8" height="0.05" depth="0.07" material="color: #241a12"></a-box>
 
-        <!-- hearth with a turf fire -->
-        <a-box position="0.45 -0.32 -1.38" width="0.44" height="0.36" depth="0.04" material="color: #17100b; roughness: 1"></a-box>
-        <a-box position="0.45 -0.475 -1.33" width="0.22" height="0.05" depth="0.1" material="color: #ff7a2a; emissive: #ff5a10; emissiveIntensity: 1.2"></a-box>
-        <a-box position="0.45 -0.12 -1.36" width="0.58" height="0.03" depth="0.09" material="color: #3a2a1c"></a-box>
+        <!-- Fireplace (your model). Built in metres, so it uses the room scale of 0.32.
+             It stands on the floor against the back wall, to the right of centre. -->
+        <a-entity id="fireplace" gltf-model="#fireplace-model"
+                  position="0.45 -0.196 -1.238" scale="0.32 0.32 0.32"></a-entity>
 
-        <!-- Sacred Heart picture and red lamp -->
-        <a-box position="-0.42 0.22 -1.39" width="0.14" height="0.18" depth="0.015" material="color: #3a2616"></a-box>
-        <a-plane position="-0.42 0.22 -1.381" width="0.11" height="0.15" material="color: #6e2a22; shader: flat"></a-plane>
-        <a-sphere position="-0.42 0.1 -1.37" radius="0.012" material="color: #ff2a2a; emissive: #ff0000; emissiveIntensity: 1.5"></a-sphere>
-        <a-entity light="type: point; color: #ff3030; intensity: 0.25; distance: 0.4" position="-0.42 0.1 -1.3"></a-entity>
+        <!-- Sacred Heart picture and red lamp, above the fireplace -->
+        <a-box position="0.45 0.36 -1.39" width="0.14" height="0.18" depth="0.015" material="color: #3a2616"></a-box>
+        <a-plane position="0.45 0.36 -1.381" width="0.11" height="0.15" material="color: #6e2a22; shader: flat"></a-plane>
+        <a-sphere position="0.45 0.235 -1.37" radius="0.012" material="color: #ff2a2a; emissive: #ff0000; emissiveIntensity: 1.5"></a-sphere>
+        <a-entity light="type: point; color: #ff3030; intensity: 0.25; distance: 0.4" position="0.45 0.235 -1.3"></a-entity>
+
+        <!-- Window (your model) set into the back wall above the table, sill about 0.9 m from the floor.
+             Behind it, an evening sky; a cool light comes in through it. -->
+        <a-plane position="-0.45 -0.015 -1.398" width="0.34" height="0.44"
+                 material="shader: flat; color: #8fa6bb"></a-plane>
+        <a-entity id="window" gltf-model="#window-model"
+                  position="-0.45 -0.009 -1.551" scale="0.32 0.32 0.32"></a-entity>
+        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.45" position="-0.45 0.35 -1.8"></a-entity>
 
         <!-- small table (a place for the 1926 radio later) -->
         <a-box position="-0.62 -0.33 -1.05" width="0.34" height="0.025" depth="0.24" material="color: #5a3e24"></a-box>
         <a-box position="-0.62 -0.42 -1.05" width="0.3" height="0.16" depth="0.2" material="color: #4a321c"></a-box>
+
+        <!-- Your radio/gramophone on the table, about 38 cm wide, turned a little towards the room.
+             The invisible box around it makes it easier to tap on a phone. -->
+        <a-entity id="radio" position="-0.62 -0.248 -1.05" rotation="0 20 0">
+          <a-entity gltf-model="#radio-model" scale="0.0736 0.0736 0.0736"></a-entity>
+          <a-box class="clickable" radio-tap width="0.2" height="0.18" depth="0.2" position="0 0.01 0"
+                 material="opacity: 0; transparent: true; depthWrite: false"></a-box>
+        </a-entity>
 
         <!-- Your grandmother and her chair, in her own scale (1 unit = 1 metre for her).
              The group is shrunk so she stands about two-thirds the height of the painting. -->
@@ -143,6 +172,11 @@
                     gltf-model="#grandmother-model"
                     play-clip="clip: Walk_to_Sit"
                     visible="false"></a-entity>
+
+          <!-- The book (Irish Idylls), about 19 cm tall, on the floor by her right foot.
+               It fades in once she has sat down. -->
+          <a-entity id="book" gltf-model="#book-model" position="1.0 0 1.9" rotation="0 -25 0"
+                    scale="0.19 0.19 0.19" visible="false"></a-entity>
 
           <!-- Súgán-style chair where the animation sits her down.
                If she sits too high or low, change the y of #chair; move it with x and z. -->
@@ -242,6 +276,72 @@
       origWarn.apply(console, args);
     };
 
+    // Fade a model in from transparent
+    function fadeIn(el, ms = 1500) {
+      el.setAttribute('visible', true);
+      const mats = [];
+      const obj = el.getObject3D('mesh');
+      if (!obj) return;
+      obj.traverse(o => { if (o.material) [].concat(o.material).forEach(m => { m.transparent = true; m.opacity = 0; mats.push(m); }); });
+      const t0 = performance.now();
+      const step = now => {
+        const k = Math.min((now - t0) / ms, 1);
+        mats.forEach(m => { m.opacity = k; if (k === 1) m.transparent = false; });
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    // The radio: tap to play music.mp3, preceded by a little static. Tap again to stop.
+    const music = new Audio('./music.mp3');
+    music.preload = 'none';   // only download the music when someone taps the radio
+    function playStatic(seconds = 1.2) {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const len = Math.floor(audioCtx.sampleRate * seconds);
+        const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < 0.02 ? 1 : 0.25) * (1 - i / len);
+        const src = audioCtx.createBufferSource(), filt = audioCtx.createBiquadFilter(), g = audioCtx.createGain();
+        filt.type = 'bandpass'; filt.frequency.value = 2200; g.gain.value = 0.35;
+        src.buffer = buf; src.connect(filt).connect(g).connect(audioCtx.destination); src.start();
+      } catch (e) {}
+    }
+    function stopRadio() {
+      music.pause(); music.currentTime = 0;
+      document.querySelector('#caption').classList.add('hidden');
+    }
+    AFRAME.registerComponent('radio-tap', {
+      init() {
+        this.el.addEventListener('click', () => {
+          const caption = document.querySelector('#caption');
+          if (!music.paused) { stopRadio(); return; }
+          playStatic();
+          // Start the music inside the tap itself (iPhones require this), muted under the static,
+          // then bring it in.
+          music.muted = true;
+          music.play().then(() => {
+            caption.classList.remove('hidden');
+            setTimeout(() => { music.muted = false; }, 900);
+          }).catch(() => {
+            caption.textContent = 'The music could not play. Check music.mp3 is on the site.';
+            caption.classList.remove('hidden');
+          });
+        });
+      }
+    });
+
+    // Gentle firelight flicker on a light
+    AFRAME.registerComponent('flicker', {
+      schema: { base: { default: 1.5 }, amount: { default: 0.3 } },
+      tick(t) {
+        const l = this.el.getObject3D('light');
+        if (!l) return;
+        const n = Math.sin(t * 0.011) * 0.5 + Math.sin(t * 0.023 + 1.3) * 0.3 + Math.sin(t * 0.047 + 2.1) * 0.2;
+        l.intensity = this.data.base + n * this.data.amount;
+      }
+    });
+
     // Plays one named animation clip from a glTF, once, holding the last pose.
     // The animation runs on its own clock, so it keeps playing even if the AR library pauses the scene.
     AFRAME.registerComponent('play-clip', {
@@ -261,6 +361,7 @@
           this.action = this.mixer.clipAction(clip);
           this.action.setLoop(THREE.LoopOnce, 1);
           this.action.clampWhenFinished = true;
+          this.mixer.addEventListener('finished', () => this.el.emit('clip-finished'));
           this.loop();
           if (this.pending) this.playClip();
         };
@@ -337,6 +438,10 @@
           this.lostTimer = setTimeout(() => this.reset(), 3000);
         });
         this.knock.addEventListener('click', () => this.open());
+        this.book = document.querySelector('#book');
+        this.woman.addEventListener('clip-finished', () => {
+          if (this.state === 'open') this.timers.push(setTimeout(() => fadeIn(this.book), 600));
+        });
       },
       open() {
         if (this.state !== 'ready') return;
@@ -362,6 +467,8 @@
         this.skin.setAttribute('visible', false);
         this.woman.setAttribute('visible', false);
         this.woman.components['play-clip'].stopClip();
+        this.book.setAttribute('visible', false);
+        stopRadio();
       }
     });
 
