@@ -48,6 +48,7 @@
     .door-button:focus-visible { outline: 3px solid var(--limewash); outline-offset: 3px; }
     .door-button[disabled] { opacity: 0.6; }
     #start { align-self: flex-start; }
+    #intro .version { margin: 1rem 0 0; font-size: 0.8rem; opacity: 0.55; }
     #knock {
       position: fixed; left: 50%; transform: translateX(-50%); z-index: 6;
       bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
@@ -137,6 +138,7 @@
     <h1>Behind the Red Door</h1>
     <p>Point your camera at the painting, then knock to step inside.</p>
     <button id="start" class="door-button" type="button">Open camera</button>
+    <p class="version">Version 14</p>
   </section>
 
   <div id="hint" class="hidden">Point your camera at the painting</div>
@@ -690,12 +692,14 @@
         tg.setAttribute('aA', new THREE.BufferAttribute(this.tA, 1));
         const tMat = new THREE.ShaderMaterial({
           transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-          uniforms: { uPR: { value: window.devicePixelRatio || 1 } },
+          uniforms: { uWorldSize: { value: 0.012 }, uHalfH: { value: 800 } },
           vertexShader: `
-            uniform float uPR; attribute float aA; varying float vA;
+            uniform float uWorldSize; uniform float uHalfH; attribute float aA; varying float vA;
             void main() {
               vA = aA; vec4 mv = modelViewMatrix * vec4(position, 1.0);
-              gl_PointSize = max(3.0, 7.0 * uPR / max(-mv.z, 0.05));
+              float scale = length((modelViewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
+              float px = uWorldSize * scale * projectionMatrix[1][1] * uHalfH / max(-mv.z, 1e-6);
+              gl_PointSize = clamp(px, 3.0, 12.0);
               gl_Position = projectionMatrix * mv;
             }`,
           fragmentShader: `
@@ -705,6 +709,7 @@
               gl_FragColor = vec4(1.0, 0.88, 0.62, smoothstep(0.5, 0.0, r) * vA);
             }`
         });
+        this.tMat = tMat;
         this.twinkles = new THREE.Points(tg, tMat); this.twinkles.frustumCulled = false;
         this.el.setObject3D('twinkles', this.twinkles);
         this.slots = [];
@@ -714,7 +719,7 @@
         const now = t / 1000, life = this.data.life;
         this.speckMat.uniforms.uTime.value = now;
         const c = this.el.sceneEl.renderer && this.el.sceneEl.renderer.domElement;
-        if (c) this.speckMat.uniforms.uHalfH.value = c.height / 2;
+        if (c) { this.speckMat.uniforms.uHalfH.value = c.height / 2; this.tMat.uniforms.uHalfH.value = c.height / 2; }
         const sm = (a, b, x) => { const k = Math.min(Math.max((x - a) / (b - a), 0), 1); return k * k * (3 - 2 * k); };
         const p = this.twinkles.geometry.attributes.position.array;
         for (let i = 0; i < this.slots.length; i++) {
@@ -724,6 +729,20 @@
           if (k >= 1) { s.start = now; s.pos = this.pick(); k = 0; }
           p[i * 3] = s.pos[0]; p[i * 3 + 1] = s.pos[1]; p[i * 3 + 2] = s.pos[2];
           this.tA[i] = sm(0.0, 0.06, k) * (1 - sm(0.1, 0.32, k));
+        }
+        if (DEBUG && (!this.lastDbg || now - this.lastDbg > 1)) {
+          this.lastDbg = now;
+          const cam = this.el.sceneEl.camera, obj = this.twinkles;
+          if (cam) {
+            const mv = new THREE.Matrix4().multiplyMatrices(cam.matrixWorldInverse, obj.matrixWorld);
+            const v = new THREE.Vector3(0, 0.1, -1.38).applyMatrix4(mv);
+            const sc = new THREE.Vector3().setFromMatrixScale(mv).x;
+            const px = u => (u * sc * cam.projectionMatrix.elements[5] * (c ? c.height / 2 : 800) / Math.max(-v.z, 1e-6)).toFixed(1);
+            const lit = Array.from(this.tA).filter(a => a > 0.05).length;
+            debug('specks', this.data.specks + ' on walls, about ' + px(0.0045) + ' px each');
+            debug('twinkles', lit + ' lit now, about ' + px(0.012) + ' px each');
+            debug('room visible', String(obj.parent && (function up(o){ for (; o; o = o.parent) if (!o.visible) return false; return true; })(obj)));
+          }
         }
         this.twinkles.geometry.attributes.position.needsUpdate = true;
         this.twinkles.geometry.attributes.aA.needsUpdate = true;
