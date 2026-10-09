@@ -61,6 +61,14 @@
       background: rgba(27,22,17,0.82); padding: 0.8rem 1rem; line-height: 1.45;
     }
     #error { display: none; border-left: 6px solid var(--door); text-align: left; }
+    #census-caption {
+      position: fixed; left: 50%; transform: translateX(-50%); z-index: 5;
+      top: calc(1rem + env(safe-area-inset-top, 0px));
+      width: min(88vw, 26rem); text-align: center;
+      font-family: "IM Fell English", Georgia, serif; font-style: italic; font-size: 1.05rem; line-height: 1.4;
+      background: rgba(27,22,17,0.7); padding: 0.55rem 0.9rem;
+      animation: fadeup 900ms both;
+    }
     #caption {
       position: fixed; left: 50%; transform: translateX(-50%); z-index: 5;
       top: calc(1rem + env(safe-area-inset-top, 0px));
@@ -134,6 +142,7 @@
   <div id="hint" class="hidden">Point your camera at the painting</div>
   <button id="knock" class="door-button hidden" type="button">Knock</button>
   <div id="error" role="alert"></div>
+  <div id="census-caption" class="hidden">Each point of light is 100 of the 2,971,992 people counted on census night</div>
   <div id="caption" class="hidden">Music generated with AI, 2026</div>
   <button id="music-btn" class="door-button hidden" type="button">Play music</button>
   <button id="book-btn" class="door-button hidden" type="button">Pick up the book</button>
@@ -206,6 +215,11 @@
         <a-box position="0 0.72 -0.35" width="1.8" height="0.05" depth="0.07" material="color: #241a12"></a-box>
         <a-box position="0 0.72 -0.95" width="1.8" height="0.05" depth="0.07" material="color: #241a12"></a-box>
 
+        <!-- The people of the census: 29,720 points of light on the walls, one for every 100 of the
+             2,971,992 people counted. Now and then one brightens and becomes a census form
+             (Form A, the household return) pasted on the wall, which slowly peels away like old wallpaper. -->
+        <a-entity census-crowd="specks: 29720; forms: 22; life: 12"></a-entity>
+
         <!-- Dust and embers drifting slowly through the room -->
         <a-entity dream-motes="count: 140"></a-entity>
 
@@ -213,12 +227,6 @@
              It stands on the floor against the back wall, to the right of centre. -->
         <a-entity id="fireplace" gltf-model="#fireplace-model"
                   position="0.45 -0.196 -1.238" scale="0.32 0.32 0.32"></a-entity>
-
-        <!-- Sacred Heart picture and red lamp, above the fireplace -->
-        <a-box position="0.45 0.36 -1.39" width="0.14" height="0.18" depth="0.015" material="color: #3a2616"></a-box>
-        <a-plane position="0.45 0.36 -1.381" width="0.11" height="0.15" material="color: #6e2a22; shader: flat"></a-plane>
-        <a-sphere position="0.45 0.235 -1.37" radius="0.012" material="color: #ff2a2a; emissive: #ff0000; emissiveIntensity: 1.5"></a-sphere>
-        <a-entity light="type: point; color: #ff3030; intensity: 0.25; distance: 0.4" position="0.45 0.235 -1.3"></a-entity>
 
         <!-- Window (your model), a third of its previous size: a small deep-set cottage window,
              about 80 cm across including its surround, sill about 1 m from the floor.
@@ -416,6 +424,7 @@
       const btn = document.querySelector('#music-btn');
       if (!music.paused) { stopRadio(); return; }
       playStatic();
+      document.querySelector('#census-caption').classList.add('hidden');
       // Start the music inside the tap itself (iPhones require this), muted under the static, then bring it in.
       music.muted = true;
       const p = music.play();
@@ -627,6 +636,183 @@
       tick(t) { if (this.mat) this.mat.opacity = 0.35 + 0.25 * Math.sin(t * 0.003); }
     });
 
+    // The census crowd: specks on the walls, some of which lift away and become census forms
+    AFRAME.registerComponent('census-crowd', {
+      schema: { specks: { default: 29720 }, forms: { default: 36 }, life: { default: 14 } },
+      init() {
+        const d = this.data;
+        // Walls of the room (room coordinates): back wall and the two side walls
+        const walls = [
+          { area: 2.25, pick: () => [-0.88 + Math.random() * 1.76, -0.48 + Math.random() * 1.2, -1.394], normal: [0, 0, 1], rotY: 0 },
+          { area: 1.75, pick: () => [-0.894, -0.48 + Math.random() * 1.2, -1.38 + Math.random() * 1.3], normal: [1, 0, 0], rotY: Math.PI / 2 },
+          { area: 1.75, pick: () => [0.894, -0.48 + Math.random() * 1.2, -1.38 + Math.random() * 1.3], normal: [-1, 0, 0], rotY: -Math.PI / 2 }
+        ];
+        const total = walls.reduce((a, w) => a + w.area, 0);
+        this.walls = walls;
+        this.pickWall = () => { let r = Math.random() * total; for (const w of walls) { if ((r -= w.area) <= 0) return w; } return walls[0]; };
+
+        // 1. Specks
+        const pos = new Float32Array(d.specks * 3), phase = new Float32Array(d.specks);
+        for (let i = 0; i < d.specks; i++) {
+          const p = this.pickWall().pick();
+          pos.set(p, i * 3); phase[i] = Math.random() * 100;
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        g.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+        this.speckMat = new THREE.ShaderMaterial({
+          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+          uniforms: { uTime: { value: 0 }, uSize: { value: 1.7 }, uPR: { value: window.devicePixelRatio || 1 } },
+          vertexShader: `
+            uniform float uTime; uniform float uSize; uniform float uPR; attribute float aPhase; varying float vB;
+            void main() {
+              vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              float tw = 0.5 + 0.5 * sin(uTime * (0.5 + fract(aPhase * 7.13) * 1.3) + aPhase);
+              vB = 0.16 + 0.84 * pow(tw, 6.0);
+              gl_PointSize = max(1.5, uSize * uPR / max(-mv.z, 0.05));
+              gl_Position = projectionMatrix * mv;
+            }`,
+          fragmentShader: `
+            varying float vB;
+            void main() {
+              float r = length(gl_PointCoord - 0.5);
+              if (r > 0.5) discard;
+              float a = smoothstep(0.5, 0.0, r) * vB * 0.6;
+              gl_FragColor = vec4(1.0, 0.9, 0.72, a);
+            }`
+        });
+        const specks = new THREE.Points(g, this.speckMat); specks.frustumCulled = false;
+        this.el.setObject3D('specks', specks);
+
+        // 2. Census sheets pasted on the walls like wallpaper. Each one appears where a speck brightens,
+        //    then its top edge comes loose and it curls forward and folds down, as if peeling off the wall.
+        const n = d.forms, tex = new THREE.TextureLoader().load('./census-form.jpg');
+        const W = 0.1, H = 0.044;
+        const geo = new THREE.PlaneGeometry(W, H, 1, 14);
+        this.aAlpha = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+        this.aGlow = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+        this.aPeel = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+        geo.setAttribute('aAlpha', this.aAlpha); geo.setAttribute('aGlow', this.aGlow); geo.setAttribute('aPeel', this.aPeel);
+        const formMat = new THREE.ShaderMaterial({
+          transparent: true, depthWrite: false, side: THREE.DoubleSide,
+          uniforms: { map: { value: tex }, uH: { value: H } },
+          vertexShader: `
+            uniform float uH;
+            attribute float aAlpha; attribute float aGlow; attribute float aPeel;
+            varying vec2 vUv; varying float vA; varying float vG; varying float vCurl;
+            void main() {
+              vUv = uv; vA = aAlpha; vG = aGlow; vCurl = 0.0;
+              vec3 p = position;
+              float y = p.y + uH * 0.5;                 // 0 at the bottom edge, uH at the top
+              float L = aPeel * uH * 0.85;              // how much of the sheet has come loose, from the top
+              float y0 = uH - L;                        // the line where it is still stuck to the wall
+              if (L > 0.0001 && y > y0) {
+                float A = aPeel * 2.95;                 // the flap folds over, up to about 170 degrees
+                float b = min(L, uH * 0.22);            // a short soft bend at the fold...
+                float R = b / max(A, 0.001);
+                float sA = y - y0;
+                float sb = min(sA, b), th = sb / R;
+                float yy = y0 + R * sin(th), zz = R * (1.0 - cos(th));
+                float rest = max(sA - b, 0.0);          // ...then the rest of the flap hangs straight
+                yy += rest * cos(A); zz += rest * sin(A);
+                y = yy; p.z += zz;
+                vCurl = min(sA / max(L, 0.0001), 1.0) * aPeel;
+              }
+              p.y = y - uH * 0.5;
+              gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
+            }`,
+          fragmentShader: `
+            uniform sampler2D map;
+            varying vec2 vUv; varying float vA; varying float vG; varying float vCurl;
+            void main() {
+              vec3 c = gl_FrontFacing ? texture2D(map, vUv).rgb * 0.9 : vec3(0.8, 0.75, 0.64);  // back of the paper is plain
+              c *= 1.0 - 0.3 * vCurl;                                                           // curled part in shadow
+              c = mix(c, vec3(1.0, 0.86, 0.62), vG * 0.7);
+              gl_FragColor = vec4(c, vA);
+            }`
+        });
+        this.forms = new THREE.InstancedMesh(geo, formMat, n);
+        this.forms.frustumCulled = false;
+        this.el.setObject3D('forms', this.forms);
+
+        const gpos = new Float32Array(n * 3);
+        this.gAlpha = new Float32Array(n);
+        const gg = new THREE.BufferGeometry();
+        gg.setAttribute('position', new THREE.BufferAttribute(gpos, 3));
+        gg.setAttribute('aA', new THREE.BufferAttribute(this.gAlpha, 1));
+        const glowMat = new THREE.ShaderMaterial({
+          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+          uniforms: { uPR: { value: window.devicePixelRatio || 1 } },
+          vertexShader: `
+            uniform float uPR; attribute float aA; varying float vA;
+            void main() {
+              vA = aA; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              gl_PointSize = max(3.0, 8.0 * uPR / max(-mv.z, 0.05));
+              gl_Position = projectionMatrix * mv;
+            }`,
+          fragmentShader: `
+            varying float vA;
+            void main() {
+              float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard;
+              gl_FragColor = vec4(1.0, 0.88, 0.62, smoothstep(0.5, 0.0, r) * vA);
+            }`
+        });
+        this.glows = new THREE.Points(gg, glowMat); this.glows.frustumCulled = false;
+        this.el.setObject3D('glows', this.glows);
+
+        this.slots = [];
+        for (let i = 0; i < n; i++) this.slots.push(this.newSlot(-Math.random() * d.life));
+        this.dummy = new THREE.Object3D();
+      },
+      // Pick a clear spot on a wall: not behind the fireplace or over the window, and not too low
+      newSlot(start) {
+        let w, p, tries = 0;
+        do {
+          w = this.pickWall(); p = w.pick(); tries++;
+          const onBack = w.rotY === 0;
+          const blocked = p[1] < -0.3 || p[1] > 0.62 ||
+            (onBack && p[0] > 0.12 && p[0] < 0.78 && p[1] < 0.16) ||          // fireplace
+            (onBack && Math.abs(p[0] + 0.3) < 0.18 && Math.abs(p[1] + 0.094) < 0.18) ||  // window
+            (!onBack && p[2] > -0.15);                                         // right at the front edge
+          if (!blocked) break;
+        } while (tries < 30);
+        const off = 0.004;
+        return {
+          start, rotY: w.rotY, tilt: (Math.random() - 0.5) * 0.12, ph: Math.random() * 6.28,
+          pos: new THREE.Vector3(p[0] + w.normal[0] * off, p[1], p[2] + w.normal[2] * off)
+        };
+      },
+      tick(t) {
+        const now = t / 1000, life = this.data.life;
+        this.speckMat.uniforms.uTime.value = now;
+        const sm = (a, b, x) => { const k = Math.min(Math.max((x - a) / (b - a), 0), 1); return k * k * (3 - 2 * k); };
+        const gp = this.glows.geometry.attributes.position.array;
+        for (let i = 0; i < this.slots.length; i++) {
+          let s = this.slots[i];
+          if (s.start < 0) s.start = now + s.start;
+          let k = (now - s.start) / life;
+          if (k >= 1) { s = this.slots[i] = this.newSlot(now); k = 0; }
+          const peel = sm(0.28, 0.82, k);
+          const sway = Math.sin(now * 0.9 + s.ph) * 0.04 * peel;
+          this.dummy.position.copy(s.pos);
+          this.dummy.position.y -= sm(0.85, 1.0, k) * 0.03;          // the loosened sheet sinks a little as it fades
+          this.dummy.rotation.set(0, s.rotY, s.tilt + sway);
+          this.dummy.scale.setScalar(0.85 + 0.15 * sm(0.06, 0.24, k));
+          this.dummy.updateMatrix();
+          this.forms.setMatrixAt(i, this.dummy.matrix);
+          this.aPeel.array[i] = peel;
+          this.aAlpha.array[i] = sm(0.06, 0.22, k) * (1 - sm(0.82, 1.0, k)) * 0.95;
+          this.aGlow.array[i] = 1 - sm(0.1, 0.3, k);
+          gp[i * 3] = s.pos.x; gp[i * 3 + 1] = s.pos.y; gp[i * 3 + 2] = s.pos.z;
+          this.gAlpha[i] = sm(0.0, 0.05, k) * (1 - sm(0.08, 0.22, k));
+        }
+        this.forms.instanceMatrix.needsUpdate = true;
+        this.aAlpha.needsUpdate = true; this.aGlow.needsUpdate = true; this.aPeel.needsUpdate = true;
+        this.glows.geometry.attributes.position.needsUpdate = true;
+        this.glows.geometry.attributes.aA.needsUpdate = true;
+      }
+    });
+
     // Gentle firelight flicker on a light
     AFRAME.registerComponent('flicker', {
       schema: { base: { default: 1.5 }, amount: { default: 0.3 } },
@@ -759,6 +945,9 @@
           document.querySelector('#book-btn').classList.remove('hidden');
           debug('book', 'shown');
         }, 2600 + 8300 + 600));
+        // Explain the specks for a few seconds once the room is open
+        this.timers.push(setTimeout(() => document.querySelector('#census-caption').classList.remove('hidden'), 4200));
+        this.timers.push(setTimeout(() => document.querySelector('#census-caption').classList.add('hidden'), 12500));
         // Music button appears once the room is open
         this.timers.push(setTimeout(() => document.querySelector('#music-btn').classList.remove('hidden'), 3500));
       },
@@ -774,6 +963,7 @@
         this.book.setAttribute('visible', false);
         document.querySelector('#book-btn').classList.add('hidden');
         document.querySelector('#music-btn').classList.add('hidden');
+        document.querySelector('#census-caption').classList.add('hidden');
         stopRadio();
         closeNewspaper();
         closeBook();
