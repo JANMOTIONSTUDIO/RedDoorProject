@@ -150,7 +150,7 @@
     <h1>Behind the Red Door</h1>
     <p>Point your camera at the painting, then knock to step inside.</p>
     <button id="start" class="door-button" type="button">Open camera</button>
-    <p class="version">Version 15</p>
+    <p class="version">Version 16</p>
   </section>
 
   <div id="hint" class="hidden">Point your camera at the painting</div>
@@ -1082,12 +1082,7 @@
         await tween(2600, k => { G_GRAN.uBurn.value = ease(k); });
         gran.setAttribute('visible', false);
 
-        // 2. The woman of 2026 forms in her place on the chair
-        modern.setAttribute('visible', true);
-        await tween(2600, k => { G_NEW.uBurn.value = 1 - ease(k); });
-        await sleep(900);
-
-        // 3. 1926 burns away around her; firelight becomes daylight
+        // 2. 1926 burns away outward from the chair; firelight becomes daylight
         const L = q => document.querySelector(q).getObject3D('light');
         document.querySelector('#light-fire').removeAttribute('flicker');
         const hemi = L('#light-hemi'), fire = L('#light-fire'), front = L('#light-front'), win = L('#light-window');
@@ -1106,7 +1101,12 @@
         room.object3D.children.forEach(o => { if (o !== stage.object3D && !o.isLight && !(o.el && o.el.hasAttribute('light'))) o.visible = false; });
         stage.object3D.children.forEach(o => { if (o !== modern.object3D && o !== chair.object3D) o.visible = false; });
         document.querySelector('#vignette').object3D.visible = false;
-        await sleep(700);
+        await sleep(1500);   // a moment with just the empty chair in the real room
+
+        // 3. Once 1926 has fully gone, the woman of 2026 forms on the chair
+        modern.setAttribute('visible', true);
+        await tween(2600, k => { G_NEW.uBurn.value = 1 - ease(k); });
+        await sleep(900);
 
         // 4. She stands up, and the chair goes too
         sts.stand();
