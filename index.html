@@ -128,6 +128,18 @@
       bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
       font-size: 1rem; padding: 0.7rem 1.2rem;
     }
+    #finale {
+      position: fixed; left: 50%; transform: translateX(-50%); z-index: 8;
+      bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+      width: min(92vw, 28rem); box-sizing: border-box;
+      background: rgba(27,22,17,0.82); padding: 1rem 1.1rem 1.1rem;
+      animation: fadeup 1200ms both;
+    }
+    #finale p { margin: 0 0 0.9rem; font-family: "IM Fell English", Georgia, serif; font-size: 1.2rem; line-height: 1.4; }
+    .finale-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+    .finale-actions .door-button { font-size: 1rem; padding: 0.75rem 1.2rem; text-decoration: none; display: inline-block; }
+    .door-button.quiet { background: transparent; border-left-color: rgba(236,229,216,0.5); }
+    #nai-link:focus-visible, #again:focus-visible { outline: 3px solid var(--limewash); outline-offset: 3px; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -138,7 +150,7 @@
     <h1>Behind the Red Door</h1>
     <p>Point your camera at the painting, then knock to step inside.</p>
     <button id="start" class="door-button" type="button">Open camera</button>
-    <p class="version">Version 14</p>
+    <p class="version">Version 15</p>
   </section>
 
   <div id="hint" class="hidden">Point your camera at the painting</div>
@@ -148,6 +160,14 @@
   <div id="caption" class="hidden">Music generated with AI, 2026</div>
   <button id="music-btn" class="door-button hidden" type="button">Play music</button>
   <button id="book-btn" class="door-button hidden" type="button">Pick up the book</button>
+
+  <div id="finale" class="hidden" role="dialog" aria-label="The census today">
+    <p>The census taken on the night of 18&nbsp;April&nbsp;1926 was opened to the public on 18&nbsp;April&nbsp;2026.</p>
+    <div class="finale-actions">
+      <a id="nai-link" class="door-button" href="https://nationalarchives.ie/collections/search-the-1926-census/" target="_blank" rel="noopener">Search the 1926 census</a>
+      <button id="again" class="door-button quiet" type="button">Start again</button>
+    </div>
+  </div>
 
   <div id="book-viewer" class="hidden" role="dialog" aria-label="Irish Idylls by Jane Barlow">
     <div id="book-stage"><img id="book-img" alt="Cover of Irish Idylls by Jane Barlow: dark green cloth with gold shamrock patterns and a gilt title panel"></div>
@@ -200,13 +220,13 @@
 
       <!-- A soft warm haze around the inside edge of the opening, so the room fades out at its borders
            like a memory. Only the outer rim is affected, so every object stays clear. -->
-      <a-plane dream-vignette width="1" height="0.8226" position="0 0 -0.002"></a-plane>
+      <a-plane id="vignette" dream-vignette width="1" height="0.8226" position="0 0 -0.002"></a-plane>
 
       <!-- The room -->
       <a-entity id="room">
-        <a-entity light="type: hemisphere; color: #ffe9cc; groundColor: #3b2c1e; intensity: 0.7"></a-entity>
-        <a-entity light="type: point; color: #ff9a4a; intensity: 1.6; distance: 2.2; decay: 1" position="0.44 -0.42 -1.05" flicker="base: 1.6; amount: 0.35"></a-entity>
-        <a-entity light="type: directional; color: #fff4e0; intensity: 0.5" position="-0.4 0.6 0.8"></a-entity>
+        <a-entity id="light-hemi" light="type: hemisphere; color: #ffe9cc; groundColor: #3b2c1e; intensity: 0.7"></a-entity>
+        <a-entity id="light-fire" light="type: point; color: #ff9a4a; intensity: 1.6; distance: 2.2; decay: 1" position="0.44 -0.42 -1.05" flicker="base: 1.6; amount: 0.35"></a-entity>
+        <a-entity id="light-front" light="type: directional; color: #fff4e0; intensity: 0.5" position="-0.4 0.6 0.8"></a-entity>
 
         <!-- floor, walls, ceiling -->
         <a-plane position="0 -0.5 -0.7" rotation="-90 0 0" width="1.8" height="1.4" dream-surface="color: #574c41; strokes: 4"></a-plane>
@@ -236,7 +256,7 @@
                  material="shader: flat; color: #a7bccf"></a-plane>
         <a-entity id="window" gltf-model="#window-model"
                   position="-0.3 -0.094 -1.445" scale="0.133 0.133 0.133"></a-entity>
-        <a-entity light="type: directional; color: #cfe0ff; intensity: 0.45" position="-0.3 0.35 -1.8"></a-entity>
+        <a-entity id="light-window" light="type: directional; color: #cfe0ff; intensity: 0.45" position="-0.3 0.35 -1.8"></a-entity>
 
         <!-- Table (your 1926 model), about 1.2 m long and 72 cm high, brought forward into the room
              on the left, clear of her path. -->
@@ -266,6 +286,10 @@
                     gltf-model="#grandmother-model"
                     play-clip="clip: Walk_to_Sit"
                     visible="false"></a-entity>
+
+          <!-- The woman of 2026. She takes the grandmother's place on the chair at the end, then stands up.
+               Positioned so her seated hips match where the grandmother's animation leaves hers. -->
+          <a-entity id="modern-woman" position="0.615 0.126 1.567" visible="false" sit-to-stand></a-entity>
 
           <!-- The book (Irish Idylls), standing on the floor to the right of her chair, cover facing
                the viewer. Placed a little back from her feet so her legs and the bottom edge of the
@@ -425,6 +449,7 @@
       const btn = document.querySelector('#music-btn');
       if (!music.paused) { stopRadio(); return; }
       playStatic();
+      discover('music');
       document.querySelector('#census-caption').classList.add('hidden');
       // Start the music inside the tap itself (iPhones require this), muted under the static, then bring it in.
       music.muted = true;
@@ -447,12 +472,14 @@
     function openNewspaper() {
       const reader = document.querySelector('#reader'), img = document.querySelector('#reader-img');
       if (!img.getAttribute('src')) img.src = './newspaper.jpg';   // only download when first opened
+      discover('newspaper');
       reader.classList.remove('zoomed');
       reader.classList.remove('hidden');
       document.querySelector('#reader-close').focus();
     }
     function closeNewspaper() {
       document.querySelector('#reader').classList.add('hidden');
+      maybeFinale();
     }
     AFRAME.registerComponent('newspaper-tap', {
       init() { this.el.addEventListener('tap', openNewspaper); }
@@ -466,12 +493,127 @@
         img.src = './book-cover.jpg';
       }
       v.classList.remove('hidden');
+      discover('book');
       [img, document.querySelector('#book-caption')].forEach(el => { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; });
       document.querySelector('#book-close').focus();
     }
-    function closeBook() { document.querySelector('#book-viewer').classList.add('hidden'); }
+    function closeBook() { document.querySelector('#book-viewer').classList.add('hidden'); maybeFinale(); }
     AFRAME.registerComponent('book-tap', {
       init() { this.el.addEventListener('tap', openBook); }
+    });
+
+    // ===== The ending =====
+    // A screen-space "burn away" that any material can be given. Each group of objects shares one set of
+    // uniforms, so a whole group dissolves together. uBurn 0 = whole, 1 = gone.
+    function burnGroup(spread, scale) {
+      return {
+        uBurn: { value: 0 }, uBurnSpread: { value: spread }, uBurnScale: { value: scale },
+        uBurnRes: { value: new THREE.Vector2(1, 1) }, uBurnCenter: { value: new THREE.Vector2(0.5, 0.5) }
+      };
+    }
+    const BURN_GLSL = `
+      uniform float uBurn; uniform float uBurnSpread; uniform float uBurnScale;
+      uniform vec2 uBurnRes; uniform vec2 uBurnCenter;
+      float bHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+      float bNoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(bHash(i), bHash(i + vec2(1.0, 0.0)), f.x), mix(bHash(i + vec2(0.0, 1.0)), bHash(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      float burnValue() {
+        vec2 q = gl_FragCoord.xy / uBurnRes.y;
+        float n = bNoise(q * uBurnScale) * 0.65 + bNoise(q * uBurnScale * 2.3) * 0.35;
+        return distance(q, uBurnCenter) * uBurnSpread + n;
+      }
+    `;
+    function injectBurn(fs) {
+      fs = fs.replace(/void\s+main\s*\(\s*\)\s*\{/, BURN_GLSL + `
+      void main() {
+        float bV = burnValue();
+        float bT = uBurn * (1.1 + uBurnSpread * 1.4);
+        if (uBurn > 0.0 && bV < bT) discard;
+      `);
+      const i = fs.lastIndexOf('}');
+      return fs.slice(0, i) + `
+        if (uBurn > 0.0 && uBurn < 1.0) gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.62, 0.25), 1.0 - smoothstep(bT, bT + 0.07, bV));
+      ` + fs.slice(i);
+    }
+    // Give every material under `root` the burn effect, skipping any objects listed in `skip`
+    function makeBurnable(root, U, skip = []) {
+      const visit = o => {
+        if (skip.includes(o)) return;
+        if (o.material) [].concat(o.material).forEach(m => {
+          if (m.userData.burn) return;
+          m.userData.burn = true;
+          if (m.isShaderMaterial) {
+            Object.assign(m.uniforms, U);
+            m.fragmentShader = injectBurn(m.fragmentShader);
+          } else {
+            m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U); sh.fragmentShader = injectBurn(sh.fragmentShader); };
+            m.customProgramCacheKey = () => 'burn';
+          }
+          m.needsUpdate = true;
+        });
+        o.children.forEach(visit);
+      };
+      visit(root);
+    }
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    function tween(ms, fn) {
+      return new Promise(res => {
+        const t0 = performance.now();
+        const step = now => { const k = Math.min((now - t0) / ms, 1); fn(k); if (k < 1) requestAnimationFrame(step); else res(); };
+        requestAnimationFrame(step);
+      });
+    }
+    const ease = k => k * k * (3 - 2 * k);
+
+    // The three discoveries: lifting the book, opening the newspaper, playing the music
+    const discovered = new Set();
+    let finaleTimer = null;
+    function discover(what) {
+      discovered.add(what);
+      debug('discovered', [...discovered].join(', ') + ' (' + discovered.size + ' of 3)');
+      maybeFinale(what === 'music' ? 7000 : 2500);
+    }
+    function maybeFinale(delay = 2500) {
+      const story = document.querySelector('[story]').components.story;
+      const overlayOpen = !document.querySelector('#reader').classList.contains('hidden') ||
+                          !document.querySelector('#book-viewer').classList.contains('hidden');
+      if (discovered.size < 3 || overlayOpen || story.state !== 'open' || finaleTimer) return;
+      finaleTimer = setTimeout(() => story.finale(), delay);
+    }
+
+    // The 2026 woman: holds her seated pose until told to stand, easing down onto her own feet as she rises
+    AFRAME.registerComponent('sit-to-stand', {
+      init() {
+        this.mixer = null; this.action = null; this.standing = false;
+        this.el.addEventListener('model-loaded', () => {
+          const model = this.el.getObject3D('mesh');
+          model.traverse(o => {
+            if (o.isMesh || o.isSkinnedMesh) o.frustumCulled = false;
+            if (o.material && o.material.emissive) o.material.emissive.set(0x000000);
+          });
+          const clip = (model.animations || [])[0];
+          if (!clip) return;
+          this.mixer = new THREE.AnimationMixer(model);
+          this.action = this.mixer.clipAction(clip);
+          this.action.setLoop(THREE.LoopOnce, 1);
+          this.action.clampWhenFinished = true;
+          this.action.play(); this.action.paused = true; this.action.time = 0;
+          this.mixer.update(0);
+          this.duration = clip.duration;
+          debug('model 2026 woman', 'loaded');
+        });
+      },
+      load() { if (!this.el.getAttribute('gltf-model')) this.el.setAttribute('gltf-model', './modern-woman.glb'); },
+      ready() { return !!this.action; },
+      stand() { if (this.action) { this.action.paused = false; this.standing = true; this.baseY = this.el.object3D.position.y; } },
+      tick(t, dt) {
+        if (!this.mixer || !this.standing) return;
+        this.mixer.update(Math.min(dt, 100) / 1000);
+        const k = Math.min(this.action.time / this.duration, 1);
+        this.el.object3D.position.y = this.baseY * (1 - ease(k));   // from chair height down to the floor
+      }
     });
 
     // Shared soft noise for the dream shaders
@@ -852,6 +994,7 @@
           if (this.state === 'ready') this.knock.classList.remove('hidden');
         });
         this.el.addEventListener('targetLost', () => {
+          if (this.state === 'finale' || this.state === 'done') return;   // the ending carries on regardless
           this.knock.classList.add('hidden');
           this.hint.classList.remove('hidden');
           clearTimeout(this.lostTimer);
@@ -884,8 +1027,99 @@
         // Explain the specks for a few seconds once the room is open
         this.timers.push(setTimeout(() => document.querySelector('#census-caption').classList.remove('hidden'), 4200));
         this.timers.push(setTimeout(() => document.querySelector('#census-caption').classList.add('hidden'), 12500));
+        // Start loading the 2026 woman quietly in the background
+        this.timers.push(setTimeout(() => document.querySelector('#modern-woman').components['sit-to-stand'].load(), 6000));
+        // Testing shortcut: add ?finale=1 to the address to jump to the ending once she has sat down
+        if (new URLSearchParams(location.search).has('finale')) {
+          this.timers.push(setTimeout(() => { ['book', 'newspaper', 'music'].forEach(w => discovered.add(w)); maybeFinale(0); }, 2600 + 8300 + 2500));
+        }
         // Music button appears once the room is open
         this.timers.push(setTimeout(() => document.querySelector('#music-btn').classList.remove('hidden'), 3500));
+      },
+      async finale() {
+        if (this.state !== 'open') return;
+        this.state = 'finale';
+        const sceneEl = this.el.sceneEl;
+        const gran = document.querySelector('#grandmother');
+        const modern = document.querySelector('#modern-woman');
+        const sts = modern.components['sit-to-stand'];
+        const room = document.querySelector('#room');
+        const stage = document.querySelector('#stage');
+        const chair = document.querySelector('#chair');
+        ['#music-btn', '#book-btn', '#census-caption', '#hint'].forEach(q => document.querySelector(q).classList.add('hidden'));
+        sts.load();
+        debug('ending', 'started');
+
+        // Burn groups: the grandmother and the new woman sparkle away / into being; the room burns outward from her
+        const G_GRAN = burnGroup(0.0, 55), G_NEW = burnGroup(0.0, 55), G_ROOM = burnGroup(1.0, 8), G_CHAIR = burnGroup(0.6, 14);
+        const groups = [G_GRAN, G_NEW, G_ROOM, G_CHAIR];
+        let running = true;
+        const centre = new THREE.Vector3();
+        const track = () => {
+          const c = sceneEl.renderer && sceneEl.renderer.domElement, cam = sceneEl.camera;
+          if (c && cam) {
+            centre.set(0.615, 0.9, 1.6); stage.object3D.localToWorld(centre); centre.project(cam);
+            groups.forEach(g => {
+              g.uBurnRes.value.set(c.width, c.height);
+              g.uBurnCenter.value.set((centre.x + 1) / 2 * c.width / c.height, (centre.y + 1) / 2);
+            });
+          }
+          if (running) requestAnimationFrame(track);
+        };
+        track();
+
+        // Wait for the 2026 woman's model if it is still downloading (up to 20 seconds)
+        for (let i = 0; i < 80 && !sts.ready(); i++) await sleep(250);
+
+        makeBurnable(gran.object3D, G_GRAN);
+        G_NEW.uBurn.value = 1;
+        makeBurnable(modern.object3D, G_NEW);
+        makeBurnable(chair.object3D, G_CHAIR);
+        makeBurnable(room.object3D, G_ROOM, [modern.object3D, chair.object3D, gran.object3D]);
+        makeBurnable(document.querySelector('#vignette').object3D, G_ROOM);
+
+        // 1. The grandmother dissolves
+        await tween(2600, k => { G_GRAN.uBurn.value = ease(k); });
+        gran.setAttribute('visible', false);
+
+        // 2. The woman of 2026 forms in her place on the chair
+        modern.setAttribute('visible', true);
+        await tween(2600, k => { G_NEW.uBurn.value = 1 - ease(k); });
+        await sleep(900);
+
+        // 3. 1926 burns away around her; firelight becomes daylight
+        const L = q => document.querySelector(q).getObject3D('light');
+        document.querySelector('#light-fire').removeAttribute('flicker');
+        const hemi = L('#light-hemi'), fire = L('#light-fire'), front = L('#light-front'), win = L('#light-window');
+        const c0 = hemi.color.clone(), g0 = hemi.groundColor.clone(), f0 = front.color.clone();
+        const i0 = { hemi: hemi.intensity, fire: fire.intensity, front: front.intensity, win: win.intensity };
+        const white = new THREE.Color('#ffffff'), grey = new THREE.Color('#8c8c8c');
+        await tween(5200, k => {
+          const e = ease(k);
+          G_ROOM.uBurn.value = e;
+          hemi.color.copy(c0).lerp(white, e); hemi.groundColor.copy(g0).lerp(grey, e);
+          hemi.intensity = i0.hemi + (1.1 - i0.hemi) * e;
+          fire.intensity = i0.fire * (1 - e); win.intensity = i0.win * (1 - e);
+          front.color.copy(f0).lerp(white, e); front.intensity = i0.front + (0.9 - i0.front) * e;
+        });
+        // hide what has burned away, so the phone stops drawing it
+        room.object3D.children.forEach(o => { if (o !== stage.object3D && !o.isLight && !(o.el && o.el.hasAttribute('light'))) o.visible = false; });
+        stage.object3D.children.forEach(o => { if (o !== modern.object3D && o !== chair.object3D) o.visible = false; });
+        document.querySelector('#vignette').object3D.visible = false;
+        await sleep(700);
+
+        // 4. She stands up, and the chair goes too
+        sts.stand();
+        await sleep(1800);
+        await tween(2000, k => { G_CHAIR.uBurn.value = ease(k); });
+        chair.object3D.visible = false;
+        await sleep(1200);
+
+        // 5. The closing card
+        running = false;
+        this.state = 'done';
+        document.querySelector('#finale').classList.remove('hidden');
+        debug('ending', 'finished');
       },
       reset() {
         this.timers.forEach(clearTimeout); this.timers = [];
@@ -939,6 +1173,7 @@
     document.querySelector('#reader-close').addEventListener('click', closeNewspaper);
     document.querySelector('#book-close').addEventListener('click', closeBook);
     document.querySelector('#book-btn').addEventListener('click', openBook);
+    document.querySelector('#again').addEventListener('click', () => location.reload());
     document.querySelector('#reader-img').addEventListener('click', e => {
       const reader = document.querySelector('#reader'), box = document.querySelector('#reader-scroll'), img = e.currentTarget;
       const r = img.getBoundingClientRect();
